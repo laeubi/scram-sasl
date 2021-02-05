@@ -18,10 +18,11 @@
 package com.bolyartech.scram_sasl.server;
 
 
+import java.security.GeneralSecurityException;
+import java.util.UUID;
+
 import com.bolyartech.scram_sasl.common.ScramException;
 import com.bolyartech.scram_sasl.common.ScramUtils;
-
-import java.util.UUID;
 
 
 /**
@@ -110,6 +111,7 @@ abstract class AbstractScramSaslServerProcessor implements ScramSaslServerProces
     }
 
 
+    @Override
     public synchronized void onMessage(String message) throws ScramException {
         if (mState != State.ENDED) {
             switch (mState) {
@@ -196,7 +198,12 @@ abstract class AbstractScramSaslServerProcessor implements ScramSaslServerProces
 
     private String handleClientFinal(String message) throws ScramException {
         mState = State.ENDED;
-        String finalMessage = mScramServerFunctionality.prepareFinalMessage(message);
+        String finalMessage;
+        try {
+            finalMessage = mScramServerFunctionality.prepareFinalMessage(message);
+        } catch (GeneralSecurityException e) {
+            throw new ScramException(e);
+        }
         if (finalMessage != null) {
             mIsSuccess = true;
             mState = State.ENDED;

@@ -18,7 +18,7 @@
 package com.bolyartech.scram_sasl.server;
 
 
-import com.bolyartech.scram_sasl.common.ScramException;
+import java.security.GeneralSecurityException;
 
 
 /**
@@ -41,12 +41,14 @@ public interface ScramServerFunctionality {
     String prepareFirstMessage(UserData userData);
 
     /**
-     * Prepares server's final message
-     * @param clientFinalMessage Client's final message
-     * @return Server's final message
-     * @throws ScramException if there is an error processing clients message
-     */
-    String prepareFinalMessage(String clientFinalMessage) throws ScramException;
+	 * Prepares server's final message
+	 * 
+	 * @param clientFinalMessage Client's final message
+	 * @return Server's final message
+	 * @throws GeneralSecurityException if there is an error processing clients
+	 *                                  message
+	 */
+	String prepareFinalMessage(String clientFinalMessage) throws GeneralSecurityException;
 
     /**
      * Checks if authentication is completed, either successfully or not.

@@ -14,33 +14,26 @@
  * limitations under the License.
  */
 
-
 package com.bolyartech.scram_sasl.server;
 
-
-import com.bolyartech.scram_sasl.common.Base64;
-import com.bolyartech.scram_sasl.common.ScramException;
-import com.bolyartech.scram_sasl.common.ScramUtils;
-
-import java.security.InvalidKeyException;
+import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.bolyartech.scram_sasl.common.Base64;
+import com.bolyartech.scram_sasl.common.ScramUtils;
 
 /**
  * Provides building blocks for creating SCRAM authentication server
  */
 @SuppressWarnings("unused")
 public class ScramServerFunctionalityImpl implements ScramServerFunctionality {
-    private static final Pattern
-            CLIENT_FIRST_MESSAGE = Pattern.compile("^(([pny])=?([^,]*),([^,]*),)(m?=?[^,]*,?n=([^,]*),r=([^,]*),?.*)$");
-    private static final Pattern
-            CLIENT_FINAL_MESSAGE = Pattern.compile("(c=([^,]*),r=([^,]*)),p=(.*)$");
-
+    private static final Pattern CLIENT_FIRST_MESSAGE = Pattern
+            .compile("^(([pny])=?([^,]*),([^,]*),)(m?=?[^,]*,?n=([^,]*),r=([^,]*),?.*)$");
+    private static final Pattern CLIENT_FINAL_MESSAGE = Pattern.compile("(c=([^,]*),r=([^,]*)),p=(.*)$");
 
     private final String mDigestName;
     private final String mHmacName;
@@ -53,22 +46,21 @@ public class ScramServerFunctionalityImpl implements ScramServerFunctionality {
     private String mServerFirstMessage;
     private UserData mUserData;
 
-
     /**
      * Creates new ScramServerFunctionalityImpl
+     * 
      * @param digestName Digest to be used
-     * @param hmacName HMAC to be used
+     * @param hmacName   HMAC to be used
      */
     public ScramServerFunctionalityImpl(String digestName, String hmacName) {
         this(digestName, hmacName, UUID.randomUUID().toString());
     }
 
-
     /**
-     /**
-     * Creates new ScramServerFunctionalityImpl
-     * @param digestName Digest to be used
-     * @param hmacName HMAC to be used
+     * /** Creates new ScramServerFunctionalityImpl
+     * 
+     * @param digestName      Digest to be used
+     * @param hmacName        HMAC to be used
      * @param serverPartNonce Server's part of the nonce
      */
     public ScramServerFunctionalityImpl(String digestName, String hmacName, String serverPartNonce) {
@@ -87,9 +79,9 @@ public class ScramServerFunctionalityImpl implements ScramServerFunctionality {
         mServerPartNonce = serverPartNonce;
     }
 
-
     /**
      * Handles client's first message
+     * 
      * @param message Client's first message
      * @return username extracted from the client message
      */
@@ -97,6 +89,7 @@ public class ScramServerFunctionalityImpl implements ScramServerFunctionality {
     public String handleClientFirstMessage(String message) {
         Matcher m = CLIENT_FIRST_MESSAGE.matcher(message);
         if (!m.matches()) {
+            mState = State.ENDED;
             return null;
         }
 
@@ -110,25 +103,20 @@ public class ScramServerFunctionalityImpl implements ScramServerFunctionality {
         return username;
     }
 
-
     @Override
     public String prepareFirstMessage(UserData userData) {
         mUserData = userData;
         mState = State.PREPARED_FIRST;
-        mServerFirstMessage = String.format("r=%s,s=%s,i=%d",
-                mNonce,
-                userData.salt,
-                userData.iterations);
+        mServerFirstMessage = String.format("r=%s,s=%s,i=%d", mNonce, userData.salt, userData.iterations);
 
         return mServerFirstMessage;
     }
 
-
     @Override
-    public String prepareFinalMessage(String clientFinalMessage) throws ScramException {
+    public String prepareFinalMessage(String clientFinalMessage) throws GeneralSecurityException {
+        mState = State.ENDED;
         Matcher m = CLIENT_FINAL_MESSAGE.matcher(clientFinalMessage);
         if (!m.matches()) {
-            mState = State.ENDED;
             return null;
         }
 
@@ -137,56 +125,45 @@ public class ScramServerFunctionalityImpl implements ScramServerFunctionality {
         String proof = m.group(4);
 
         if (!mNonce.equals(clientNonce)) {
-            mState = State.ENDED;
             return null;
         }
-
 
         String authMessage = mClientFirstMessageBare + "," + mServerFirstMessage + "," + clientFinalMessageWithoutProof;
 
         byte[] storedKeyArr = Base64.decode(mUserData.storedKey);
 
-        try {
-            byte[] clientSignature = ScramUtils.computeHmac(storedKeyArr, mHmacName, authMessage);
-            byte[] serverSignature = ScramUtils.computeHmac(Base64.decode(mUserData.serverKey), mHmacName, authMessage);
-            byte[] clientKey = clientSignature.clone();
-            byte[] decodedProof = Base64.decode(proof);
-            for (int i = 0; i < clientKey.length; i++) {
-                clientKey[i] ^= decodedProof[i];
-            }
-
-            byte[] resultKey = MessageDigest.getInstance(mDigestName).digest(clientKey);
-            if (!Arrays.equals(storedKeyArr, resultKey)) {
-                return null;
-            }
-
-
-            mIsSuccessful = true;
-            mState = State.ENDED;
-            return "v=" + Base64.encodeBytes(serverSignature, Base64.DONT_BREAK_LINES);
-        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
-            mState = State.ENDED;
-            throw new ScramException(e);
+        byte[] clientSignature = ScramUtils.computeHmac(storedKeyArr, mHmacName, authMessage);
+        byte[] serverSignature = ScramUtils.computeHmac(Base64.decode(mUserData.serverKey), mHmacName, authMessage);
+        byte[] clientKey = clientSignature.clone();
+        byte[] decodedProof = Base64.decode(proof);
+        for (int i = 0; i < clientKey.length; i++) {
+            clientKey[i] ^= decodedProof[i];
         }
-    }
 
+        byte[] resultKey = MessageDigest.getInstance(mDigestName).digest(clientKey);
+        if (!Arrays.equals(storedKeyArr, resultKey)) {
+            return null;
+        }
+
+        String result = "v=" + Base64.encodeBytes(serverSignature, Base64.DONT_BREAK_LINES);
+        mIsSuccessful = true;
+        return result;
+    }
 
     @Override
     public boolean isSuccessful() {
         if (mState == State.ENDED) {
             return mIsSuccessful;
         } else {
-            throw new IllegalStateException("You cannot call this method before authentication is ended. " +
-                    "Use isEnded() to check that");
+            throw new IllegalStateException(
+                    "You cannot call this method before authentication is ended. " + "Use isEnded() to check that");
         }
     }
-
 
     @Override
     public boolean isEnded() {
         return mState == State.ENDED;
     }
-
 
     @Override
     public State getState() {

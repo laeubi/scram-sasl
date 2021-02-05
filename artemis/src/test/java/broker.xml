@@ -1,0 +1,26 @@
+<configuration
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns="urn:activemq"
+	xsi:schemaLocation="urn:activemq/schema/artemis-server.xsd">
+	<core xmlns="urn:activemq:core">
+
+		<persistence-enabled>false</persistence-enabled>
+
+		<security-enabled>false</security-enabled>
+
+		<acceptors>
+			<acceptor name="amqp">tcp://localhost:5672?protocols=AMQP</acceptor>
+		</acceptors>
+		<security-settings>
+			<security-setting match="#">
+				<permission type="createAddress" roles="guest" />
+				<permission type="createDurableQueue" roles="guest" />
+				<permission type="deleteDurableQueue" roles="guest" />
+				<permission type="createNonDurableQueue" roles="guest" />
+				<permission type="deleteNonDurableQueue" roles="guest" />
+				<permission type="consume" roles="guest" />
+				<permission type="send" roles="guest" />
+			</security-setting>
+		</security-settings>
+	</core>
+</configuration>

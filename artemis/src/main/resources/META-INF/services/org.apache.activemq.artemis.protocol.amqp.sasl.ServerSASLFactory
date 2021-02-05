@@ -1,0 +1,3 @@
+artemis.SHA1SCRAMServerSASLFactory
+artemis.SHA256SCRAMServerSASLFactory
+artemis.SHA512CRAMServerSASLFactory

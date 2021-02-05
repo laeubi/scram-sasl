@@ -2,22 +2,32 @@
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
+
 	<parent>
 		<artifactId>parent</artifactId>
 		<groupId>scram-sasl</groupId>
 		<version>0.0.1-SNAPSHOT</version>
 	</parent>
-	<artifactId>examples</artifactId>
+
+	<artifactId>artemis</artifactId>
+	<properties>
+		<artemis-version>2.17.0-SNAPSHOT</artemis-version>
+	</properties>
 	<dependencies>
+		<dependency>
+			<groupId>org.apache.activemq</groupId>
+			<artifactId>artemis-server</artifactId>
+			<version>${artemis-version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.activemq</groupId>
+			<artifactId>artemis-amqp-protocol</artifactId>
+			<version>${artemis-version}</version>
+		</dependency>
 		<dependency>
 			<groupId>scram-sasl</groupId>
 			<artifactId>lib</artifactId>
 			<version>0.0.1-SNAPSHOT</version>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.qpid</groupId>
-			<artifactId>qpid-jms-client</artifactId>
-			<version>0.56.0</version>
 		</dependency>
 	</dependencies>
 </project>
