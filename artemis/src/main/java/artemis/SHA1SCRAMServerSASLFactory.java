@@ -43,4 +43,9 @@ public class SHA1SCRAMServerSASLFactory extends SCRAMServerSASLFactory {
 		}
 	}
 
+	@Override
+	public int getPrecedence() {
+		return 100;
+	}
+
 }

@@ -52,6 +52,11 @@ public abstract class SCRAMServerSASLFactory implements ServerSASLFactory {
 	}
 
 	@Override
+	public boolean isDefaultPermitted() {
+		return false;
+	}
+
+	@Override
 	public ServerSASL create(ActiveMQServer server, ProtocolManager<AmqpInterceptor> manager, Connection connection,
 			RemotingConnection remotingConnection) {
 		System.out.println("==== initiate " + method + " ====");

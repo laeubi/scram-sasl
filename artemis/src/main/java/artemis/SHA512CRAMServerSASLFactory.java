@@ -42,4 +42,9 @@ public class SHA512CRAMServerSASLFactory extends SCRAMServerSASLFactory {
 			throw new RuntimeException(e);
 		}
 	}
+
+	@Override
+	public int getPrecedence() {
+		return 500;
+	}
 }
