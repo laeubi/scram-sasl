@@ -1,4 +1,0 @@
-rootProject.name = 'SCRAM SASL Examples'
-
-include ':scram_sasl'
-project(':scram_sasl').projectDir=new File("$settingsDir/../lib")
