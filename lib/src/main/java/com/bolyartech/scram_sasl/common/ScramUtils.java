@@ -30,7 +30,6 @@ import javax.crypto.spec.SecretKeySpec;
 /**
  * Provides static methods for working with SCRAM/SASL
  */
-@SuppressWarnings({"WeakerAccess", "unused"})
 public class ScramUtils {
     private static final byte[] INT_1 = new byte[]{0, 0, 0, 1};
 
@@ -46,19 +45,22 @@ public class ScramUtils {
      * @param password        Clear form password, i.e. what user typed
      * @param salt            Salt to be used
      * @param iterationsCount Iterations for 'salting'
-     * @param hmacName        HMAC to be used
+     * @param mac             HMAC to be used
      * @return salted password
-     * @throws InvalidKeyException      if internal error occur while working with SecretKeySpec
-     * @throws NoSuchAlgorithmException if hmacName is not supported by the java
+     * @throws ScramException
+     * @throws InvalidKeyException if internal error occur while working with
+     *                             SecretKeySpec
      */
     public static byte[] generateSaltedPassword(final String password,
                                                 byte[] salt,
                                                 int iterationsCount,
-                                                String hmacName) throws InvalidKeyException, NoSuchAlgorithmException {
-
-
-        Mac mac = createHmac(password.getBytes(StandardCharsets.US_ASCII), hmacName);
-
+            Mac mac) throws ScramException {
+        SecretKeySpec key = new SecretKeySpec(password.getBytes(StandardCharsets.US_ASCII), mac.getAlgorithm());
+        try {
+            mac.init(key);
+        } catch (InvalidKeyException e) {
+            throw new ScramException("Incompatible key", e);
+        }
         mac.update(salt);
         mac.update(INT_1);
         byte[] result = mac.doFinal();
@@ -137,41 +139,34 @@ public class ScramUtils {
 
 
     /**
-     * Computes the data associated with new password like salted password, keys, etc
+     * Computes the data associated with new password like salted password, keys,
+     * etc
      * <p>
-     * This method is supposed to be used by a server when user provides new clear form password.
-     * We don't want to save it that way so we generate salted password and store it along with
-     * other data required by the SCRAM mechanism
+     * This method is supposed to be used by a server when user provides new clear
+     * form password. We don't want to save it that way so we generate salted
+     * password and store it along with other data required by the SCRAM mechanism
      *
      * @param passwordClearText Clear form password, i.e. as provided by the user
      * @param salt              Salt to be used
      * @param iterations        Iterations for 'salting'
-     * @param hmacName          HMAC name to be used
-     * @param digestName        Digest name to be used
-     * @return new password data
-     * @throws NoSuchAlgorithmException if hmacName is not supported by the java
-     * @throws InvalidKeyException      InvalidKeyException if internal error occur while working with SecretKeySpec
+     * @param mac               HMAC name to be used
+     * @param messageDigest     Digest name to be used
+     * @return new password data while working with SecretKeySpec
+     * @throws ScramException
      */
     public static NewPasswordByteArrayData newPassword(String passwordClearText,
                                                        byte[] salt,
                                                        int iterations,
-                                                       String digestName,
-                                                       String hmacName)
-            throws NoSuchAlgorithmException, InvalidKeyException {
-
-        if (!hmacName.toLowerCase().startsWith("hmac")) {
-            throw new IllegalArgumentException("Invalid HMAC. Please check digestName and hmacName " +
-                    "to be in correct order");
-        }
-
+            MessageDigest messageDigest, Mac mac)
+            throws ScramException {
         byte[] saltedPassword = ScramUtils.generateSaltedPassword(passwordClearText,
                 salt,
                 iterations,
-                hmacName);
+                mac);
 
-        byte[] clientKey = ScramUtils.computeHmac(saltedPassword, hmacName, "Client Key");
-        byte[] storedKey = MessageDigest.getInstance(digestName).digest(clientKey);
-        byte[] serverKey = ScramUtils.computeHmac(saltedPassword, hmacName, "Server Key");
+        byte[] clientKey = ScramUtils.computeHmac(saltedPassword, mac, "Client Key");
+        byte[] storedKey = messageDigest.digest(clientKey);
+        byte[] serverKey = ScramUtils.computeHmac(saltedPassword, mac, "Server Key");
 
         return new NewPasswordByteArrayData(saltedPassword, salt, clientKey, storedKey, serverKey, iterations);
     }
@@ -187,7 +182,6 @@ public class ScramUtils {
     public static NewPasswordStringData byteArrayToStringData(NewPasswordByteArrayData ba) {
         return new NewPasswordStringData(Base64.encodeBytes(ba.saltedPassword,
                 Base64.DONT_BREAK_LINES),
-
                 Base64.encodeBytes(ba.salt, Base64.DONT_BREAK_LINES),
                 Base64.encodeBytes(ba.clientKey, Base64.DONT_BREAK_LINES),
                 Base64.encodeBytes(ba.storedKey, Base64.DONT_BREAK_LINES),

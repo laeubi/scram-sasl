@@ -13,7 +13,7 @@ import org.apache.qpid.jms.JmsConnectionFactory;
 
 public class QPIDClient {
 	public static void main(String[] args) throws JMSException {
-		for (String method : new String[] { "SCRAM-SHA-1", "SCRAM-SHA-256" }) {
+		for (String method : new String[] { "SCRAM-SHA-256" }) {
 			ConnectionFactory connectionFactory = new JmsConnectionFactory(
 					"amqp://localhost:5672?amqp.saslMechanisms=" + method);
 			Connection connection = connectionFactory.createConnection("hello", "ogre1234");

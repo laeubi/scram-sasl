@@ -128,6 +128,9 @@ public abstract class SCRAMServerSASLFactory implements ServerSASLFactory {
 										((DigestCallback) callback).setDigest(scram.getDigest());
 									} else if (callback instanceof HmacCallback) {
 										((HmacCallback) callback).setHmac(scram.getHmac());
+									} else {
+										throw new UnsupportedCallbackException(callback,
+												"Unrecognized Callback " + callback.getClass().getSimpleName());
 									}
 								}
 							}

@@ -15,31 +15,10 @@
  */
 package artemis;
 
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
-
-import com.bolyartech.scram_sasl.common.ScramUtils;
-import com.bolyartech.scram_sasl.server.UserData;
-
 public class SHA1SCRAMServerSASLFactory extends SCRAMServerSASLFactory {
 
 	public SHA1SCRAMServerSASLFactory() {
 		super("SCRAM-SHA-1", "SHA-1", "HmacSHA1");
-	}
-
-	protected UserData getUserData() {
-		SecureRandom random = new SecureRandom();
-		byte[] salt = new byte[24];
-		random.nextBytes(salt);
-		try {
-			ScramUtils.NewPasswordStringData data = ScramUtils
-					.byteArrayToStringData(ScramUtils.newPassword("ogre1234", salt, 4096, "SHA-1", "HmacSHA1"));
-			return new UserData(data.salt, data.iterations, data.serverKey, data.storedKey);
-
-		} catch (NoSuchAlgorithmException | InvalidKeyException e) {
-			throw new RuntimeException(e);
-		}
 	}
 
 	@Override

@@ -17,11 +17,6 @@
 package com.bolyartech.scram_sasl.client;
 
 
-import com.bolyartech.scram_sasl.common.Base64;
-import com.bolyartech.scram_sasl.common.ScramException;
-import com.bolyartech.scram_sasl.common.ScramUtils;
-import com.bolyartech.scram_sasl.common.StringPrep;
-
 import java.nio.charset.Charset;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
@@ -31,6 +26,12 @@ import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.crypto.Mac;
+
+import com.bolyartech.scram_sasl.common.Base64;
+import com.bolyartech.scram_sasl.common.ScramException;
+import com.bolyartech.scram_sasl.common.ScramUtils;
+import com.bolyartech.scram_sasl.common.StringPrep;
 
 /**
  * Provides building blocks for creating SCRAM authentication client
@@ -148,7 +149,7 @@ public class ScramClientFunctionalityImpl implements ScramClientFunctionality {
             mSaltedPassword = ScramUtils.generateSaltedPassword(password,
                     Base64.decode(salt),
                     iterations,
-                    mHmacName);
+                    Mac.getInstance(mHmacName));
 
 
             String clientFinalMessageWithoutProof = "c=" + Base64.encodeBytes(GS2_HEADER.getBytes(ASCII)
