@@ -15,14 +15,23 @@
  */
 package artemis;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
+import java.security.NoSuchAlgorithmException;
+import java.util.Iterator;
 import java.util.UUID;
 
 import javax.security.auth.Subject;
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.NameCallback;
+import javax.security.auth.callback.UnsupportedCallbackException;
+import javax.security.auth.login.LoginContext;
 
 import org.apache.activemq.artemis.core.server.ActiveMQServer;
 import org.apache.activemq.artemis.protocol.amqp.broker.AmqpInterceptor;
+import org.apache.activemq.artemis.protocol.amqp.broker.ProtonProtocolManager;
 import org.apache.activemq.artemis.protocol.amqp.sasl.SASLResult;
 import org.apache.activemq.artemis.protocol.amqp.sasl.ServerSASL;
 import org.apache.activemq.artemis.protocol.amqp.sasl.ServerSASLFactory;
@@ -30,9 +39,14 @@ import org.apache.activemq.artemis.spi.core.protocol.ProtocolManager;
 import org.apache.activemq.artemis.spi.core.protocol.RemotingConnection;
 import org.apache.activemq.artemis.spi.core.remoting.Connection;
 
+import com.bolyartech.scram_sasl.common.ScramException;
 import com.bolyartech.scram_sasl.server.ScramServerFunctionality;
 import com.bolyartech.scram_sasl.server.ScramServerFunctionalityImpl;
 import com.bolyartech.scram_sasl.server.UserData;
+
+import artemis.jaas.DigestCallback;
+import artemis.jaas.HmacCallback;
+import artemis.jaas.SCRAMMechanismCallback;
 
 public abstract class SCRAMServerSASLFactory implements ServerSASLFactory {
 
@@ -53,30 +67,37 @@ public abstract class SCRAMServerSASLFactory implements ServerSASLFactory {
 
 	@Override
 	public boolean isDefaultPermitted() {
-		return false;
+		return true;
 	}
 
 	@Override
 	public ServerSASL create(ActiveMQServer server, ProtocolManager<AmqpInterceptor> manager, Connection connection,
 			RemotingConnection remotingConnection) {
 		System.out.println("==== initiate " + method + " ====");
-		return new SCRAMServerSASL(method,
-				new ScramServerFunctionalityImpl(digestName, hmacName, UUID.randomUUID().toString()), getUserData());
+		try {
+			if (manager instanceof ProtonProtocolManager) {
+				ScramServerFunctionalityImpl scram = new ScramServerFunctionalityImpl(digestName, hmacName,
+						UUID.randomUUID().toString());
+				String loginConfigScope = ((ProtonProtocolManager) manager).getSaslLoginConfigScope();
+				return new SCRAMServerSASL(method, scram, loginConfigScope);
+			}
+		} catch (NoSuchAlgorithmException e) {
+			// can't be used then...
+		}
+		return null;
 	}
-
-	protected abstract UserData getUserData();
 
 	private static final class SCRAMServerSASL implements ServerSASL {
 
 		private String name;
 		private ScramServerFunctionality scram;
 		private SASLResult result;
-		private UserData userData;
+		private String loginConfigScope;
 
-		public SCRAMServerSASL(String name, ScramServerFunctionality scram, UserData userData) {
+		public SCRAMServerSASL(String name, ScramServerFunctionality scram, String loginConfigScope) {
 			this.name = name;
 			this.scram = scram;
-			this.userData = userData;
+			this.loginConfigScope = loginConfigScope;
 		}
 
 		@Override
@@ -92,11 +113,34 @@ public abstract class SCRAMServerSASLFactory implements ServerSASLFactory {
 				switch (scram.getState()) {
 				case INITIAL: {
 					String userName = scram.handleClientFirstMessage(message);
-					result = new SCRAMSASLResult(userName, scram);
 					if (userName != null) {
-						String challenge = scram.prepareFirstMessage(userData);
-						System.out.println(" >>> " + challenge + " [" + scram.getState() + "]");
-						return challenge.getBytes(StandardCharsets.US_ASCII);
+
+						LoginContext loginContext = new LoginContext(loginConfigScope, new CallbackHandler() {
+
+							@Override
+							public void handle(Callback[] callbacks) throws IOException, UnsupportedCallbackException {
+								for (Callback callback : callbacks) {
+									if (callback instanceof NameCallback) {
+										((NameCallback) callback).setName(userName);
+									} else if (callback instanceof SCRAMMechanismCallback) {
+										((SCRAMMechanismCallback) callback).setMechanism(name);
+									} else if (callback instanceof DigestCallback) {
+										((DigestCallback) callback).setDigest(scram.getDigest());
+									} else if (callback instanceof HmacCallback) {
+										((HmacCallback) callback).setHmac(scram.getHmac());
+									}
+								}
+							}
+						});
+						loginContext.login();
+						Subject subject = loginContext.getSubject();
+						Iterator<UserData> credentials = subject.getPublicCredentials(UserData.class).iterator();
+						if (credentials.hasNext()) {
+							result = new SCRAMSASLResult(userName, scram, subject);
+							String challenge = scram.prepareFirstMessage(credentials.next());
+							System.out.println(" >>> " + challenge + " [" + scram.getState() + "]");
+							return challenge.getBytes(StandardCharsets.US_ASCII);
+						}
 					}
 					break;
 				}
@@ -113,7 +157,7 @@ public abstract class SCRAMServerSASLFactory implements ServerSASLFactory {
 					System.out.println("???");
 					break;
 				}
-			} catch (GeneralSecurityException e) {
+			} catch (GeneralSecurityException | ScramException | RuntimeException e) {
 				result = new SCRAMFailedSASLResult();
 				e.printStackTrace();
 			}
@@ -138,10 +182,12 @@ public abstract class SCRAMServerSASLFactory implements ServerSASLFactory {
 
 		private String userName;
 		private ScramServerFunctionality scram;
+		private Subject subject;
 
-		public SCRAMSASLResult(String userName, ScramServerFunctionality scram) {
+		public SCRAMSASLResult(String userName, ScramServerFunctionality scram, Subject subject) {
 			this.userName = userName;
 			this.scram = scram;
+			this.subject = subject;
 		}
 
 		@Override
@@ -151,7 +197,7 @@ public abstract class SCRAMServerSASLFactory implements ServerSASLFactory {
 
 		@Override
 		public Subject getSubject() {
-			return null;
+			return subject;
 		}
 
 		@Override

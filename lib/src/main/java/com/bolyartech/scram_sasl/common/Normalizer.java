@@ -1,5 +1,3 @@
-package com.bolyartech.scram_sasl.common;
-
 /**
  * Copyright 2011 Glenn Maynard
  * <p>
@@ -15,6 +13,7 @@ package com.bolyartech.scram_sasl.common;
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.bolyartech.scram_sasl.common;
 
 
 import java.lang.reflect.InvocationTargetException;

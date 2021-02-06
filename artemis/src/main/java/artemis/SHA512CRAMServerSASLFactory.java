@@ -28,7 +28,6 @@ public class SHA512CRAMServerSASLFactory extends SCRAMServerSASLFactory {
 		super("SCRAM-SHA-512", "SHA-512", "HmacSHA512");
 	}
 
-	@Override
 	protected UserData getUserData() {
 		SecureRandom random = new SecureRandom();
 		byte[] salt = new byte[24];

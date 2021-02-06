@@ -28,7 +28,6 @@ public class SHA1SCRAMServerSASLFactory extends SCRAMServerSASLFactory {
 		super("SCRAM-SHA-1", "SHA-1", "HmacSHA1");
 	}
 
-	@Override
 	protected UserData getUserData() {
 		SecureRandom random = new SecureRandom();
 		byte[] salt = new byte[24];

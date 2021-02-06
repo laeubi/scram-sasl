@@ -16,14 +16,17 @@
 
 package com.bolyartech.scram_sasl.server;
 
-import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.crypto.Mac;
+
 import com.bolyartech.scram_sasl.common.Base64;
+import com.bolyartech.scram_sasl.common.ScramException;
 import com.bolyartech.scram_sasl.common.ScramUtils;
 
 /**
@@ -35,8 +38,6 @@ public class ScramServerFunctionalityImpl implements ScramServerFunctionality {
             .compile("^(([pny])=?([^,]*),([^,]*),)(m?=?[^,]*,?n=([^,]*),r=([^,]*),?.*)$");
     private static final Pattern CLIENT_FINAL_MESSAGE = Pattern.compile("(c=([^,]*),r=([^,]*)),p=(.*)$");
 
-    private final String mDigestName;
-    private final String mHmacName;
     private final String mServerPartNonce;
 
     private boolean mIsSuccessful = false;
@@ -45,14 +46,17 @@ public class ScramServerFunctionalityImpl implements ScramServerFunctionality {
     private String mNonce;
     private String mServerFirstMessage;
     private UserData mUserData;
+    private MessageDigest digest;
+    private Mac hmac;
 
     /**
      * Creates new ScramServerFunctionalityImpl
      * 
      * @param digestName Digest to be used
      * @param hmacName   HMAC to be used
+     * @throws NoSuchAlgorithmException
      */
-    public ScramServerFunctionalityImpl(String digestName, String hmacName) {
+    public ScramServerFunctionalityImpl(String digestName, String hmacName) throws NoSuchAlgorithmException {
         this(digestName, hmacName, UUID.randomUUID().toString());
     }
 
@@ -62,8 +66,10 @@ public class ScramServerFunctionalityImpl implements ScramServerFunctionality {
      * @param digestName      Digest to be used
      * @param hmacName        HMAC to be used
      * @param serverPartNonce Server's part of the nonce
+     * @throws NoSuchAlgorithmException
      */
-    public ScramServerFunctionalityImpl(String digestName, String hmacName, String serverPartNonce) {
+    public ScramServerFunctionalityImpl(String digestName, String hmacName, String serverPartNonce)
+            throws NoSuchAlgorithmException {
         if (ScramUtils.isNullOrEmpty(digestName)) {
             throw new NullPointerException("digestName cannot be null or empty");
         }
@@ -73,9 +79,8 @@ public class ScramServerFunctionalityImpl implements ScramServerFunctionality {
         if (ScramUtils.isNullOrEmpty(serverPartNonce)) {
             throw new NullPointerException("serverPartNonce cannot be null or empty");
         }
-
-        mDigestName = digestName;
-        mHmacName = hmacName;
+        digest = MessageDigest.getInstance(digestName);
+        hmac = Mac.getInstance(hmacName);
         mServerPartNonce = serverPartNonce;
     }
 
@@ -84,13 +89,14 @@ public class ScramServerFunctionalityImpl implements ScramServerFunctionality {
      * 
      * @param message Client's first message
      * @return username extracted from the client message
+     * @throws ScramException
      */
     @Override
-    public String handleClientFirstMessage(String message) {
+    public String handleClientFirstMessage(String message) throws ScramException {
         Matcher m = CLIENT_FIRST_MESSAGE.matcher(message);
         if (!m.matches()) {
             mState = State.ENDED;
-            return null;
+            throw new ScramException("Invalid message received");
         }
 
         mClientFirstMessageBare = m.group(5);
@@ -113,11 +119,11 @@ public class ScramServerFunctionalityImpl implements ScramServerFunctionality {
     }
 
     @Override
-    public String prepareFinalMessage(String clientFinalMessage) throws GeneralSecurityException {
+    public String prepareFinalMessage(String clientFinalMessage) throws ScramException {
         mState = State.ENDED;
         Matcher m = CLIENT_FINAL_MESSAGE.matcher(clientFinalMessage);
         if (!m.matches()) {
-            return null;
+            throw new ScramException("Invalid message received");
         }
 
         String clientFinalMessageWithoutProof = m.group(1);
@@ -125,24 +131,23 @@ public class ScramServerFunctionalityImpl implements ScramServerFunctionality {
         String proof = m.group(4);
 
         if (!mNonce.equals(clientNonce)) {
-            return null;
+            throw new ScramException("Nonce mismatch");
         }
 
         String authMessage = mClientFirstMessageBare + "," + mServerFirstMessage + "," + clientFinalMessageWithoutProof;
 
         byte[] storedKeyArr = Base64.decode(mUserData.storedKey);
-
-        byte[] clientSignature = ScramUtils.computeHmac(storedKeyArr, mHmacName, authMessage);
-        byte[] serverSignature = ScramUtils.computeHmac(Base64.decode(mUserData.serverKey), mHmacName, authMessage);
+        byte[] clientSignature = ScramUtils.computeHmac(storedKeyArr, hmac, authMessage);
+        byte[] serverSignature = ScramUtils.computeHmac(Base64.decode(mUserData.serverKey), hmac, authMessage);
         byte[] clientKey = clientSignature.clone();
         byte[] decodedProof = Base64.decode(proof);
         for (int i = 0; i < clientKey.length; i++) {
             clientKey[i] ^= decodedProof[i];
         }
 
-        byte[] resultKey = MessageDigest.getInstance(mDigestName).digest(clientKey);
+        byte[] resultKey = digest.digest(clientKey);
         if (!Arrays.equals(storedKeyArr, resultKey)) {
-            return null;
+            throw new ScramException("Nonce mismatch");
         }
 
         String result = "v=" + Base64.encodeBytes(serverSignature, Base64.DONT_BREAK_LINES);
@@ -168,5 +173,31 @@ public class ScramServerFunctionalityImpl implements ScramServerFunctionality {
     @Override
     public State getState() {
         return mState;
+    }
+
+    @Override
+    public MessageDigest getDigest() {
+        try {
+            return (MessageDigest) digest.clone();
+        } catch (CloneNotSupportedException cns) {
+            try {
+                return MessageDigest.getInstance(digest.getAlgorithm());
+            } catch (NoSuchAlgorithmException nsa) {
+                throw new AssertionError(nsa);
+            }
+        }
+    }
+
+    @Override
+    public Mac getHmac() {
+        try {
+            return (Mac) hmac.clone();
+        } catch (CloneNotSupportedException cns) {
+            try {
+                return Mac.getInstance(hmac.getAlgorithm());
+            } catch (NoSuchAlgorithmException nsa) {
+                throw new AssertionError(nsa);
+            }
+        }
     }
 }

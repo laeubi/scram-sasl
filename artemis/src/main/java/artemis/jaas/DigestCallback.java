@@ -1,4 +1,5 @@
 /*
+ * Copyright 2021 Christoph Läubrich
  * <p>
  * All rights reserved. Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,21 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package artemis;
+package artemis.jaas;
 
-import java.util.Arrays;
+import java.security.MessageDigest;
 
-import org.apache.activemq.artemis.core.server.embedded.EmbeddedActiveMQ;
-import org.apache.activemq.artemis.protocol.amqp.sasl.MechanismFinder;
+import javax.security.auth.callback.Callback;
 
-public class TestServer {
-	public static void main(String[] args) throws Exception {
-		String[] defaultMechanisms = MechanismFinder.getDefaultMechanisms();
-		System.out.println(Arrays.toString(defaultMechanisms));
-		EmbeddedActiveMQ embedded = new EmbeddedActiveMQ();
-		embedded.start();
-		while (true)
-			;
+public class DigestCallback implements Callback {
 
+	private MessageDigest digest;
+
+	public void setDigest(MessageDigest digest) {
+		this.digest = digest;
 	}
+
+	public MessageDigest getDigest() {
+		return digest;
+	}
+
 }

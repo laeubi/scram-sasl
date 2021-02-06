@@ -19,6 +19,11 @@ package com.bolyartech.scram_sasl.server;
 
 
 import java.security.GeneralSecurityException;
+import java.security.MessageDigest;
+
+import javax.crypto.Mac;
+
+import com.bolyartech.scram_sasl.common.ScramException;
 
 
 /**
@@ -28,10 +33,12 @@ import java.security.GeneralSecurityException;
 public interface ScramServerFunctionality {
     /**
      * Handles client's first message
+     * 
      * @param message Client's first message
      * @return username extracted from the client message
+     * @throws ScramException
      */
-    String handleClientFirstMessage(String message);
+    String handleClientFirstMessage(String message) throws ScramException;
 
     /**
      * Prepares server's first message
@@ -41,14 +48,15 @@ public interface ScramServerFunctionality {
     String prepareFirstMessage(UserData userData);
 
     /**
-	 * Prepares server's final message
-	 * 
-	 * @param clientFinalMessage Client's final message
-	 * @return Server's final message
-	 * @throws GeneralSecurityException if there is an error processing clients
-	 *                                  message
-	 */
-	String prepareFinalMessage(String clientFinalMessage) throws GeneralSecurityException;
+     * Prepares server's final message
+     * 
+     * @param clientFinalMessage Client's final message
+     * @return Server's final message
+     * @throws GeneralSecurityException if there is an error processing clients
+     *                                  message
+     * @throws ScramException
+     */
+    String prepareFinalMessage(String clientFinalMessage) throws GeneralSecurityException, ScramException;
 
     /**
      * Checks if authentication is completed, either successfully or not.
@@ -93,4 +101,8 @@ public interface ScramServerFunctionality {
          */
         ENDED
     }
+
+    MessageDigest getDigest();
+
+    Mac getHmac();
 }

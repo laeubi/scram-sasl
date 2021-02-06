@@ -17,11 +17,11 @@
 
 package com.bolyartech.scram_sasl.common;
 
+import java.security.GeneralSecurityException;
 
 /**
  * Indicates error while processing SCRAM sequence
  */
-@SuppressWarnings("unused")
 public class ScramException extends Exception {
     /**
      * Creates new ScramException
@@ -29,6 +29,10 @@ public class ScramException extends Exception {
      */
     public ScramException(String message) {
         super(message);
+    }
+
+    public ScramException(String message, GeneralSecurityException e) {
+        super(message, e);
     }
 
 

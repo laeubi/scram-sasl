@@ -18,12 +18,13 @@
 package com.bolyartech.scram_sasl.common;
 
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 
 
 /**
@@ -87,8 +88,8 @@ public class ScramUtils {
     public static Mac createHmac(final byte[] keyBytes, String hmacName) throws NoSuchAlgorithmException,
             InvalidKeyException {
 
-        SecretKeySpec key = new SecretKeySpec(keyBytes, hmacName);
         Mac mac = Mac.getInstance(hmacName);
+        SecretKeySpec key = new SecretKeySpec(keyBytes, hmacName);
         mac.init(key);
         return mac;
     }
@@ -110,6 +111,17 @@ public class ScramUtils {
         Mac mac = createHmac(key, hmacName);
         mac.update(string.getBytes(StandardCharsets.US_ASCII));
         return mac.doFinal();
+    }
+
+    public static byte[] computeHmac(final byte[] key, Mac hmac, final String string) throws ScramException {
+
+        try {
+            hmac.init(new SecretKeySpec(key, hmac.getAlgorithm()));
+        } catch (InvalidKeyException e) {
+            throw new ScramException("invalid key", e);
+        }
+        hmac.update(string.getBytes(StandardCharsets.US_ASCII));
+        return hmac.doFinal();
     }
 
 
