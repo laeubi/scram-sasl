@@ -13,12 +13,15 @@ import org.apache.qpid.jms.JmsConnectionFactory;
 
 public class QPIDClient {
 	public static void main(String[] args) throws JMSException {
-		for (String method : new String[] { "SCRAM-SHA-256" }) {
+		for (String method : new String[] { "SCRAM-SHA-1", "SCRAM-SHA-256" }) {
 			ConnectionFactory connectionFactory = new JmsConnectionFactory(
 					"amqp://localhost:5672?amqp.saslMechanisms=" + method);
-			// Connection connection = connectionFactory.createConnection("hello",
-			// "ogre1234");
-			Connection connection = connectionFactory.createConnection("test", "test");
+			Connection connection;
+			if ("SCRAM-SHA-256".equals(method)) {
+				connection = connectionFactory.createConnection("test", "test");
+			} else {
+				connection = connectionFactory.createConnection("hello", "ogre1234");
+			}
 			try {
 				Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
 				Queue queue = session.createQueue("exampleQueue");
