@@ -19,13 +19,14 @@ package com.bolyartech.scram_sasl.server;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
+import java.util.Base64;
+import java.util.Base64.Decoder;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.crypto.Mac;
 
-import com.bolyartech.scram_sasl.common.Base64;
 import com.bolyartech.scram_sasl.common.ScramException;
 import com.bolyartech.scram_sasl.common.ScramUtils;
 
@@ -136,11 +137,11 @@ public class ScramServerFunctionalityImpl implements ScramServerFunctionality {
 
         String authMessage = mClientFirstMessageBare + "," + mServerFirstMessage + "," + clientFinalMessageWithoutProof;
 
-        byte[] storedKeyArr = Base64.decode(mUserData.storedKey);
+        byte[] storedKeyArr = Base64.getDecoder().decode(mUserData.storedKey);
         byte[] clientSignature = ScramUtils.computeHmac(storedKeyArr, hmac, authMessage);
-        byte[] serverSignature = ScramUtils.computeHmac(Base64.decode(mUserData.serverKey), hmac, authMessage);
+        byte[] serverSignature = ScramUtils.computeHmac(Base64.getDecoder().decode(mUserData.serverKey), hmac, authMessage);
         byte[] clientKey = clientSignature.clone();
-        byte[] decodedProof = Base64.decode(proof);
+        byte[] decodedProof = Base64.getDecoder().decode(proof);
         for (int i = 0; i < clientKey.length; i++) {
             clientKey[i] ^= decodedProof[i];
         }
@@ -150,7 +151,7 @@ public class ScramServerFunctionalityImpl implements ScramServerFunctionality {
             throw new ScramException("Nonce mismatch");
         }
 
-        String result = "v=" + Base64.encodeBytes(serverSignature, Base64.DONT_BREAK_LINES);
+        String result = "v=" + Base64.getEncoder().encodeToString(serverSignature);
         mIsSuccessful = true;
         return result;
     }

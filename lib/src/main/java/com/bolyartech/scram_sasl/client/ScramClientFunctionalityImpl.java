@@ -22,13 +22,13 @@ import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.crypto.Mac;
 
-import com.bolyartech.scram_sasl.common.Base64;
 import com.bolyartech.scram_sasl.common.ScramException;
 import com.bolyartech.scram_sasl.common.ScramUtils;
 import com.bolyartech.scram_sasl.common.StringPrep;
@@ -147,13 +147,13 @@ public class ScramClientFunctionalityImpl implements ScramClientFunctionality {
 
         try {
             mSaltedPassword = ScramUtils.generateSaltedPassword(password,
-                    Base64.decode(salt),
+                    Base64.getDecoder().decode(salt),
                     iterations,
                     Mac.getInstance(mHmacName));
 
 
-            String clientFinalMessageWithoutProof = "c=" + Base64.encodeBytes(GS2_HEADER.getBytes(ASCII)
-                    , Base64.DONT_BREAK_LINES)
+            String clientFinalMessageWithoutProof = "c=" + Base64.getEncoder()
+                    .encodeToString(GS2_HEADER.getBytes(ASCII))
                     + ",r=" + nonce;
 
             mAuthMessage = mClientFirstMessageBare + "," + serverFirstMessage + "," + clientFinalMessageWithoutProof;
@@ -169,7 +169,7 @@ public class ScramClientFunctionalityImpl implements ScramClientFunctionality {
             }
 
             mState = State.FINAL_PREPARED;
-            return clientFinalMessageWithoutProof + ",p=" + Base64.encodeBytes(clientProof, Base64.DONT_BREAK_LINES);
+            return clientFinalMessageWithoutProof + ",p=" + Base64.getEncoder().encodeToString(clientProof);
         } catch (InvalidKeyException | NoSuchAlgorithmException e) {
             mState = State.ENDED;
             throw new ScramException(e);
@@ -190,7 +190,7 @@ public class ScramClientFunctionalityImpl implements ScramClientFunctionality {
             return false;
         }
 
-        byte[] serverSignature = Base64.decode(m.group(1));
+        byte[] serverSignature = Base64.getDecoder().decode(m.group(1));
 
         mState = State.ENDED;
         mIsSuccessful = Arrays.equals(serverSignature, getExpectedServerSignature());

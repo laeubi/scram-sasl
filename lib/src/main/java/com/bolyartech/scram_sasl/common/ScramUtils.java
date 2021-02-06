@@ -22,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -180,12 +181,9 @@ public class ScramUtils {
      * @return String data
      */
     public static NewPasswordStringData byteArrayToStringData(NewPasswordByteArrayData ba) {
-        return new NewPasswordStringData(Base64.encodeBytes(ba.saltedPassword,
-                Base64.DONT_BREAK_LINES),
-                Base64.encodeBytes(ba.salt, Base64.DONT_BREAK_LINES),
-                Base64.encodeBytes(ba.clientKey, Base64.DONT_BREAK_LINES),
-                Base64.encodeBytes(ba.storedKey, Base64.DONT_BREAK_LINES),
-                Base64.encodeBytes(ba.serverKey, Base64.DONT_BREAK_LINES),
+        return new NewPasswordStringData(Base64.getEncoder().encodeToString(ba.saltedPassword),
+                Base64.getEncoder().encodeToString(ba.salt), Base64.getEncoder().encodeToString(ba.clientKey),
+                Base64.getEncoder().encodeToString(ba.storedKey), Base64.getEncoder().encodeToString(ba.serverKey),
                 ba.iterations
         );
     }
