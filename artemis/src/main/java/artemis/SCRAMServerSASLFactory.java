@@ -50,36 +50,32 @@ import artemis.jaas.SCRAMMechanismCallback;
 
 public abstract class SCRAMServerSASLFactory implements ServerSASLFactory {
 
-	private String method;
-	private String digestName;
-	private String hmacName;
+	private SCRAM scramType;
 
-	public SCRAMServerSASLFactory(String method, String digestName, String hmacName) {
-		this.method = method;
-		this.digestName = digestName;
-		this.hmacName = hmacName;
+	public SCRAMServerSASLFactory(SCRAM scram) {
+		this.scramType = scram;
 	}
 
 	@Override
 	public String getMechanism() {
-		return method;
+		return scramType.getName();
 	}
 
 	@Override
 	public boolean isDefaultPermitted() {
-		return true;
+		return false;
 	}
 
 	@Override
 	public ServerSASL create(ActiveMQServer server, ProtocolManager<AmqpInterceptor> manager, Connection connection,
 			RemotingConnection remotingConnection) {
-		System.out.println("==== initiate " + method + " ====");
 		try {
 			if (manager instanceof ProtonProtocolManager) {
-				ScramServerFunctionalityImpl scram = new ScramServerFunctionalityImpl(digestName, hmacName,
+				ScramServerFunctionalityImpl scram = new ScramServerFunctionalityImpl(scramType.getDigest(),
+						scramType.getHmac(),
 						UUID.randomUUID().toString());
 				String loginConfigScope = ((ProtonProtocolManager) manager).getSaslLoginConfigScope();
-				return new SCRAMServerSASL(method, scram, loginConfigScope);
+				return new SCRAMServerSASL(scramType.getName(), scram, loginConfigScope);
 			}
 		} catch (NoSuchAlgorithmException e) {
 			// can't be used then...
@@ -108,7 +104,6 @@ public abstract class SCRAMServerSASLFactory implements ServerSASLFactory {
 		@Override
 		public byte[] processSASL(byte[] bytes) {
 			String message = new String(bytes, StandardCharsets.US_ASCII);
-			System.out.println("<<< " + message + " [" + scram.getState() + "]");
 			try {
 				switch (scram.getState()) {
 				case INITIAL: {
@@ -141,7 +136,6 @@ public abstract class SCRAMServerSASLFactory implements ServerSASLFactory {
 						if (credentials.hasNext()) {
 							result = new SCRAMSASLResult(userName, scram, subject);
 							String challenge = scram.prepareFirstMessage(credentials.next());
-							System.out.println(" >>> " + challenge + " [" + scram.getState() + "]");
 							return challenge.getBytes(StandardCharsets.US_ASCII);
 						}
 					}
@@ -150,19 +144,17 @@ public abstract class SCRAMServerSASLFactory implements ServerSASLFactory {
 				case PREPARED_FIRST: {
 					String finalMessage = scram.prepareFinalMessage(message);
 					if (finalMessage != null) {
-						System.out.println(" >>> " + finalMessage + " [" + scram.getState() + "]");
 						return finalMessage.getBytes(StandardCharsets.US_ASCII);
 					}
 					break;
 				}
 
 				default:
-					System.out.println("???");
+					result = new SCRAMFailedSASLResult();
 					break;
 				}
 			} catch (GeneralSecurityException | ScramException | RuntimeException e) {
 				result = new SCRAMFailedSASLResult();
-				e.printStackTrace();
 			}
 			return null;
 		}

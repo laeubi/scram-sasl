@@ -18,7 +18,7 @@ package artemis;
 public class SHA1SCRAMServerSASLFactory extends SCRAMServerSASLFactory {
 
 	public SHA1SCRAMServerSASLFactory() {
-		super("SCRAM-SHA-1", "SHA-1", "HmacSHA1");
+		super(SCRAM.SHA1);
 	}
 
 	@Override

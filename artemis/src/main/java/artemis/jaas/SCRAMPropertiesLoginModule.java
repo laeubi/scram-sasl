@@ -16,13 +16,17 @@
 package artemis.jaas;
 
 import java.io.IOException;
+import java.security.GeneralSecurityException;
+import java.security.MessageDigest;
 import java.security.Principal;
 import java.security.SecureRandom;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
+import javax.crypto.Mac;
 import javax.security.auth.Subject;
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.CallbackHandler;
@@ -42,8 +46,12 @@ import com.bolyartech.scram_sasl.common.ScramException;
 import com.bolyartech.scram_sasl.common.ScramUtils;
 import com.bolyartech.scram_sasl.server.UserData;
 
+import artemis.SCRAM;
+
 public class SCRAMPropertiesLoginModule extends PropertiesLoader implements AuditLoginModule {
 
+	private static final String SEPARATOR = ":";
+	private static final int MIN_ITERATIONS = 4096;
 	private Subject subject;
 	private CallbackHandler callbackHandler;
 	private Properties users;
@@ -77,15 +85,13 @@ public class SCRAMPropertiesLoginModule extends PropertiesLoader implements Audi
 			throw new FailedLoginException("User does not exist: " + user);
 		}
 		if (PasswordMaskingUtil.isEncMasked(password)) {
-			String unwrap = PasswordMaskingUtil.unwrap(password);
-			// TODO
+			String[] unwrap = PasswordMaskingUtil.unwrap(password).split(SEPARATOR);
+			userData = new UserData(unwrap[0], Integer.parseInt(unwrap[1]), unwrap[2], unwrap[3]);
 		} else {
 			DigestCallback digestCallback = new DigestCallback();
 			HmacCallback hmacCallback = new HmacCallback();
 			executeCallbacks(new Callback[] { digestCallback, hmacCallback });
-			SecureRandom random = new SecureRandom();
-			byte[] salt = new byte[24];
-			random.nextBytes(salt);
+			byte[] salt = generateSalt();
 			try {
 				ScramUtils.NewPasswordStringData data = ScramUtils.byteArrayToStringData(ScramUtils
 						.newPassword(password, salt, 4096, digestCallback.getDigest(), hmacCallback.getHmac()));
@@ -95,6 +101,13 @@ public class SCRAMPropertiesLoginModule extends PropertiesLoader implements Audi
 			}
 		}
 		return true;
+	}
+
+	private static byte[] generateSalt() {
+		byte[] salt = new byte[24];
+		SecureRandom random = new SecureRandom();
+		random.nextBytes(salt);
+		return salt;
 	}
 
 	private void executeCallbacks(Callback[] callbacks) throws LoginException {
@@ -139,6 +152,45 @@ public class SCRAMPropertiesLoginModule extends PropertiesLoader implements Audi
 		subject.getPublicCredentials().remove(userData);
 		userData = null;
 		return true;
+	}
+
+	public static void main(String[] args) throws GeneralSecurityException, ScramException {
+		if (args.length < 3) {
+			System.out.println("Usage: " + SCRAMPropertiesLoginModule.class.getSimpleName()
+					+ " <username> <password> <type> [<iterations>]");
+			System.out.println("\ttype: "
+					+ getSupportedTypes());
+			System.out.println("\titerations desired number of iteration (min value: " + MIN_ITERATIONS + ")");
+			return;
+		}
+		String username = args[0];
+		String password = args[1];
+		String type = args[2];
+		SCRAM scram = Arrays.stream(SCRAM.values()).filter(v -> v.getName().equals(type)).findFirst()
+				.orElseThrow(() -> new IllegalArgumentException(
+						"unkown type " + type + ", supported ones are " + getSupportedTypes()));
+		MessageDigest digest = MessageDigest.getInstance(scram.getDigest());
+		Mac hmac = Mac.getInstance(scram.getHmac());
+		byte[] salt = generateSalt();
+		int iterations;
+		if (args.length > 3) {
+			iterations = Integer.parseInt(args[3]);
+			if (iterations < MIN_ITERATIONS) {
+				throw new IllegalArgumentException("minimum of " + MIN_ITERATIONS + " required!");
+			}
+		} else {
+			iterations = MIN_ITERATIONS;
+		}
+		ScramUtils.NewPasswordStringData data = ScramUtils
+				.byteArrayToStringData(ScramUtils.newPassword(password, salt, iterations, digest, hmac));
+		System.out.println(username + " = "
+				+ PasswordMaskingUtil
+						.wrap(data.salt + SEPARATOR + data.iterations + SEPARATOR + data.serverKey + SEPARATOR
+								+ data.storedKey));
+	}
+
+	private static String getSupportedTypes() {
+		return String.join(", ", Arrays.stream(SCRAM.values()).map(SCRAM::getName).toArray(String[]::new));
 	}
 
 }

@@ -16,7 +16,9 @@ public class QPIDClient {
 		for (String method : new String[] { "SCRAM-SHA-256" }) {
 			ConnectionFactory connectionFactory = new JmsConnectionFactory(
 					"amqp://localhost:5672?amqp.saslMechanisms=" + method);
-			Connection connection = connectionFactory.createConnection("hello", "ogre1234");
+			// Connection connection = connectionFactory.createConnection("hello",
+			// "ogre1234");
+			Connection connection = connectionFactory.createConnection("test", "test");
 			try {
 				Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
 				Queue queue = session.createQueue("exampleQueue");
